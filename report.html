@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>School Progress</title>
+<style>
+  :root { --bg: #faf6ee; --card: #fff; --ink: #2b2433; --soft: #6d6578; --line: #e6e0d4; --bar: #5c4a99; --barbg: #e6e1ee; --good: #2e7d4f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1820; --card: #26222d; --ink: #eee9f3; --soft: #a99fb5; --line: #3a3443; --bar: #9d8ae0; --barbg: #3a3446; --good: #6fcf97; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 21px; margin: 0 0 2px; }
+  h3 { font-size: 15px; margin: 18px 0 6px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; }
+  .soft { color: var(--soft); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 16px 0; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 4px 12px; align-items: center; margin: 6px 0; }
+  .bar { height: 10px; border-radius: 5px; background: var(--barbg); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--bar); }
+  .detail { grid-column: 1 / -1; font-size: 14px; color: var(--soft); margin-top: -2px; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li.done { color: var(--good); }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .essay { white-space: pre-wrap; border-left: 3px solid var(--line); padding-left: 10px; margin: 4px 0 12px; }
+  code { font-size: 14px; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>School progress</h1>
+  <p id="when" class="soft">Loading...</p>
+  <p><button id="reload">Refresh</button></p>
+  <div id="kids"></div>
+  <div class="card" id="alerts"></div>
+</main>
+<script>
+(function () {
+  // Everything on the server is scrambled on the Chromebook with this link's key, which
+  // never leaves this page. The server only files it under a hash of the key.
+  var key = (location.hash || '').slice(1);
+  var $ = function (id) { return document.getElementById(id); };
+  var MAGIC = 'aotl-home-1\n';
+  var server = '';
+  function hex(buf) { return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
+  function sha(text) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)); }
+  function boxId() { return sha('aotl-home-id:' + key).then(hex); }
+  function aesKey() { return sha('aotl-home-aes:' + key).then(function (raw) { return crypto.subtle.importKey('raw', raw, 'AES-CBC', false, ['encrypt', 'decrypt']); }); }
+  function openText(b64) {
+    var raw = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
+    return aesKey().then(function (k) { return crypto.subtle.decrypt({ name: 'AES-CBC', iv: raw.slice(0, 16) }, k, raw.slice(16)); })
+      .then(function (plain) { var t = new TextDecoder().decode(plain); if (t.indexOf(MAGIC) !== 0) throw new Error('not ours'); return JSON.parse(t.slice(MAGIC.length)); });
+  }
+  function seal(value) {
+    var iv = crypto.getRandomValues(new Uint8Array(16));
+    return aesKey().then(function (k) { return crypto.subtle.encrypt({ name: 'AES-CBC', iv: iv }, k, new TextEncoder().encode(MAGIC + JSON.stringify(value))); })
+      .then(function (c) { var all = new Uint8Array(16 + c.byteLength); all.set(iv); all.set(new Uint8Array(c), 16); var s = ''; all.forEach(function (b) { s += String.fromCharCode(b); }); return btoa(s); });
+  }
+  function el(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+  function bar(title, value, total, detail) {
+    var r = el('div', null, 'row');
+    r.appendChild(el('div', title));
+    var b = el('div', null, 'bar'); var i = el('i'); i.style.width = Math.round(100 * Math.min(1, value / Math.max(1, total))) + '%'; b.appendChild(i); r.appendChild(b);
+    r.appendChild(el('div', detail, 'detail'));
+    return r;
+  }
+  var status = { done: 'done', in_progress: 'started', todo: 'not yet' };
+  function show(data) {
+    var rep = data.report;
+    $('when').textContent = 'Last update from the Chromebook: ' + (rep.sent || data.received) + '.';
+    var box = $('kids'); box.textContent = '';
+    rep.children.forEach(function (c) {
+      var card = el('div', null, 'card');
+      card.appendChild(el('h2', c.name));
+      card.appendChild(el('div', c.lessons + ' lessons in all, ' + c.stars + ' stars, ' + c.points + ' prize points.', 'soft'));
+      if (c.levels) card.appendChild(el('div', 'Levels: ' + c.levels, 'soft'));
+      card.appendChild(el('h3', 'Today' + (c.day_done ? ': all done' : '')));
+      var ul = el('ul');
+      c.today.forEach(function (w) { ul.appendChild(el('li', w.title + ': ' + (status[w.status] || w.status) + (w.times > 1 ? ' (' + w.times + ' times)' : ''), w.status === 'done' ? 'done' : '')); });
+      card.appendChild(ul);
+      if (c.by_day && c.by_day.length) card.appendChild(el('div', 'Lessons per day: ' + c.by_day.map(function (d) { return d[0].slice(5) + ': ' + d[1]; }).join(', '), 'soft'));
+      card.appendChild(el('h3', 'Books and skills'));
+      c.books.forEach(function (b) { card.appendChild(bar(b.subject, b.mastered, b.total, b.mastered + ' of ' + b.total + ' done. Now: ' + b.now + '.' + (b.pct >= 0 ? ' ' + b.pct + '% right on first tries.' : ''))); });
+      if (c.tests.length) {
+        card.appendChild(el('h3', 'Test day'));
+        c.tests.forEach(function (t) { var last = t.scores[t.scores.length - 1]; card.appendChild(bar(t.section, last, 100, 'Last ' + last + '% (' + t.last + '). Scores: ' + t.scores.join('%, ') + '%')); });
+      }
+      if (c.weak && c.weak.length) {
+        card.appendChild(el('h3', 'Test skills to work on'));
+        var wl = el('ul'); c.weak.forEach(function (s) { wl.appendChild(el('li', s.section + ', ' + s.skill + ': ' + s.right + ' of ' + s.total + ' (' + s.pct + '%)')); }); card.appendChild(wl);
+      }
+      if ((c.asks && c.asks.length) || (c.wishes && c.wishes.length)) {
+        card.appendChild(el('h3', 'Prizes'));
+        var pl = el('ul');
+        (c.asks || []).forEach(function (a) { pl.appendChild(el('li', 'Asked for ' + a + '. Answer in the parent area.')); });
+        (c.wishes || []).forEach(function (w) { pl.appendChild(el('li', 'Wished for ' + w + '. Set a price in the parent area.')); });
+        card.appendChild(pl);
+      }
+      if (c.essays && c.essays.length) {
+        card.appendChild(el('h3', 'Essays'));
+        c.essays.forEach(function (e) { card.appendChild(el('div', e.date + ', ' + e.words + ' words: ' + e.prompt)); card.appendChild(el('div', e.text || '(nothing written)', 'essay')); });
+      }
+      box.appendChild(card);
+    });
+    showAlerts(data.alerts, data.topic, data.email);
+  }
+  function showAlerts(on, topic, email) {
+    var a = $('alerts'); a.textContent = '';
+    a.appendChild(el('h2', 'Email alerts: ' + (on && email ? 'on, to ' + email : 'off')));
+    a.appendChild(el('p', 'An email when a child finishes the day, gets a Test day score, or asks for a prize. The short message passes through ntfy.sh, a free alert service, on its way to you.', 'soft'));
+    var input = el('input'); input.type = 'email'; input.placeholder = 'you@gmail.com'; input.value = email || '';
+    input.style.cssText = 'font: inherit; padding: 8px; width: 100%; max-width: 320px; margin: 0 8px 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink);';
+    a.appendChild(input);
+    var said = el('p', '', 'soft');
+    // The change goes in the box for the Chromebook, which does it the next time it sends.
+    function send(on, mail) {
+      if (on && !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(mail)) { said.textContent = 'That email address does not look right.'; return; }
+      Promise.all([boxId(), seal({ fn: 'alerts', on: on, email: on ? mail : '' })]).then(function (v) {
+        return fetch(server + '/api/home', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: v[0], op: v[1] }) });
+      }).then(function (r) {
+        said.textContent = r.ok ? 'Saved. It starts the next time the Chromebook sends (a minute or two while School is open there).' : 'The site would not take that. Try again later.';
+      }).catch(function () { said.textContent = 'Could not reach the site. Check the connection.'; });
+    }
+    var save = el('button', on && email ? 'Change address' : 'Turn on email alerts');
+    save.onclick = function () { send(true, input.value.trim()); };
+    a.appendChild(save);
+    if (on) {
+      var off = el('button', 'Turn off'); off.style.marginLeft = '8px';
+      off.onclick = function () { send(false, ''); };
+      a.appendChild(off);
+      var p = el('p', null, 'soft');
+      p.appendChild(document.createTextNode('Want phone notifications too? In the free ntfy app, subscribe to '));
+      p.appendChild(el('code', topic)); p.appendChild(document.createTextNode('. The first email may land in spam: mark it as not spam.'));
+      a.appendChild(p);
+    }
+    a.appendChild(said);
+  }
+  function load() {
+    if (!/^[0-9a-f]{32}$/.test(key)) { $('when').textContent = 'This link is missing its secret part. Copy it again from the parent area on the Chromebook.'; return; }
+    $('when').textContent = 'Loading...';
+    var get = server ? Promise.resolve() : fetch('home_server.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) { server = String(d.url || '').replace(/\/$/, ''); });
+    get.then(boxId).then(function (id) { return fetch(server + '/api/home?id=' + id, { cache: 'no-store' }); })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.copy) { $('when').textContent = 'No report yet. On the Chromebook, open the parent area and tap Send now.'; return null; }
+        return openText(d.copy).then(function (c) {
+          var a = c.alerts || {};
+          show({ report: c.report, received: d.saved, alerts: !!a.on, topic: a.topic || '', email: a.email || '' });
+        });
+      }).catch(function () { $('when').textContent = 'Could not reach the site, or this link is out of date. Check the connection and refresh.'; });
+  }
+  $('reload').onclick = load;
+  load();
+})();
+</script>
+</body>
+</html>
