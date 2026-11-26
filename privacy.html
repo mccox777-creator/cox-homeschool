@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Angels of the Lord: privacy and help</title>
+<style>
+  :root { --bg: #fbf3e6; --card: #ffffff; --ink: #231d3a; --soft: #5b5470; --accent: #5b4d9d; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17141f; --card: #221e2d; --ink: #f1ecff; --soft: #b9b2cc; --accent: #b3a6ff; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  section { background: var(--card); border-radius: 14px; padding: 8px 22px 14px; margin: 18px 0; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  h2 { font-size: 21px; color: var(--accent); }
+  p.sub, .soft { color: var(--soft); }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Angels of the Lord</h1>
+<p class="sub">A Catholic homeschool app and game for one family's children. Privacy policy and help. Last updated November 23, 2026.</p>
+
+<section id="privacy">
+<h2>Privacy policy</h2>
+<p>The short version: we do not collect anything about you or your children. There are no accounts, no ads, no tracking, no analytics and no purchases.</p>
+<ul>
+  <li><strong>On the device.</strong> Children's names, work, stars, levels and the parent PIN are kept on the device they are entered on. The PIN is stored only as a scrambled check value.</li>
+  <li><strong>Linking your own computers (off until the parent turns it on).</strong> A parent can link the family's devices, so a child's work follows her from one to another and the parent can see it from another computer. When it is on, everything is scrambled on the device (AES encryption) with a key that only your family's devices have, before it is sent. Our small server only stores those scrambled boxes, under a code made from the key, and cannot read them. Nobody else, including us, can open them without your key.</li>
+  <li><strong>Progress page (off until the parent turns it on).</strong> Works the same way: the summary is scrambled on the device and only opens in a browser that has your family's link.</li>
+  <li><strong>Email or phone alerts (off until the parent turns them on).</strong> If a parent turns them on, short messages such as "Anna finished today's work" pass through ntfy.sh, a free alert service, on their way to the parent. Those messages can be read by that service. Leave alerts off if you do not want that.</li>
+  <li><strong>Microphone.</strong> Where the app listens to a child read, speech is recognized on the device. Audio is never recorded, kept or sent anywhere.</li>
+  <li><strong>Children.</strong> The app is made for children, used with a parent. Because nothing about a child is collected or readable by us, there is nothing for us to share, sell or show.</li>
+  <li><strong>Removing your data.</strong> Deleting the app removes everything on that device. Turning linking off in the parent area stops sending. A scrambled copy already on the server cannot be read by anyone without your family's key.</li>
+</ul>
+<p class="soft">If this policy changes, the new version will be posted on this page with a new date.</p>
+</section>
+
+<section id="help">
+<h2>Help</h2>
+<ul>
+  <li><strong>Getting started:</strong> open the SCHOOL card, choose a 4-number parent PIN, then add each child. The app gives a short starting test and then takes each child as far as they go, one level at a time.</li>
+  <li><strong>School on more than one device:</strong> in the parent area, turn on "The children's computers". On the new device, tap "Join school from another computer" on the first screen and type the code shown in the parent area.</li>
+  <li><strong>Back up progress:</strong> parent area, "Back up progress".</li>
+</ul>
+</section>
+</main>
+</body>
+</html>
